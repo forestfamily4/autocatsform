@@ -7,7 +7,7 @@ namespace autocatsform
     public partial class Form1 : Form
     {
         private AutoCat a;
-        private static Label label1__;
+        private static RichTextBox label1__;
         private static string logtext_="";
         public static bool b2022nenn=false;
         public static string logtext
@@ -34,6 +34,7 @@ namespace autocatsform
         public Form1()
         {
             InitializeComponent();
+            this.TopMost = true;
         }
         public void thinking()
         {
@@ -54,8 +55,7 @@ namespace autocatsform
 
 
             this.TopMost = true;
-            Form1.label1__ = label1;
-            label1.Text = "thinking";
+            Form1.label1__ = this.richTextBox2;
             a =new AutoCat();
             AutoCat.Instance = a;
             a.log($"dataファイル:{path}");
@@ -73,6 +73,7 @@ namespace autocatsform
 
         private void button1_Click(object sender, EventArgs e)
         {
+            this.TopMost = true;
             string a = richTextBox1.Text;
             var b=a.Split("\n");
             for(int i= 0;i<b.Length;i++)
@@ -122,22 +123,33 @@ namespace autocatsform
                 File.Create(path).Close();
                 var templatetxt =
 @"
-wait 3000;
-push 0;
-↑0番目のものをクリックします waitはミリ秒(1000=1秒)です;
-loop 3;
-    wait 2000;
-    push 1;
-    loop 3;
-        wait 1000;
-    };      
-};
-↑ループ処理です ;
+wait 3000
+push 0
+↑0番目のものをクリックします waitはミリ秒(1000=1秒)です
+loop 3{
+    wait 2000
+    push 1
+    loop 3{
+        wait 1000
+        log test
+    }     
+}
+↑ループ処理です ちなみに{はいらないです
 
 ";
                 File.WriteAllText(path, templatetxt);
             }
             System.Diagnostics.Process.Start("EXPLORER.EXE", path);
+
+        }
+
+        private void tableLayoutPanel1_Paint(object sender, PaintEventArgs e)
+        {
+
+        }
+
+        private void panel1_Paint(object sender, PaintEventArgs e)
+        {
 
         }
     }
@@ -165,6 +177,7 @@ loop 3;
 
         public async Task Main_(List<MouseEventControl> mec)
         {
+            AutoCat.m = mec;
             if (Form1.b2022nenn)
             {
                 log("始まり");
@@ -182,9 +195,11 @@ loop 3;
                     await Task.Delay(1000 * 60 * 100);//100分
                 }
             }
-
-            //new MouseEventControl(705,1058).Run();
-            AutoCat.m = mec;
+            else
+            {
+                ExecLoopFile();
+            }
+            
         }
 
         async void Loop()
@@ -209,41 +224,106 @@ loop 3;
             var path = Application.UserAppDataPath + @"\loopfile.txt";
             var text = File.ReadAllText(path);
             text = text.ToLower();
-            var a = text.Split(";");
+            await ExecLoopTask(text);            
+        }
+
+
+        async Task ExecLoopTask(string text)
+        {
+            var aaa = text.Split("\n");
+            List<string> a = new List<string>();
+            a.AddRange(aaa);
+            a.Select(a =>  a = DeleteFormerSpace(a) );
             int i = 0;
-            while(i<a.Length)
+            while (i < a.Count)
             {
-                var b = a[i];
-                if (!(b.StartsWith("wait") || b.StartsWith("loop") || b.StartsWith("push"))) { continue; }
+                var b = a[i].Trim();
                 if (b.StartsWith("wait"))
                 {
-                    await Task.Delay(int.Parse(b.Substring(5).Replace(" ","")));
+                    var c = b.Substring(5).Replace(" ", "");
+                    int dd=0;
+                    if(!int.TryParse(c, out dd)) { Error($"intが不適です\n{a[i ] ?? ""} <--- HERE "); break; }
+                    log($"待つ:{dd}");
+                    await Task.Delay(dd);
                 }
                 else if (b.StartsWith("push"))
                 {
-                    m[int.Parse(b.Substring(5).Replace(" ", ""))].Run();
+                    var c = b.Substring(5).Replace(" ", "");
+                    int dd = 0;
+                    if (!int.TryParse(c, out dd)) { Error($"intが不適です\n{a[i] ?? ""} <--- HERE");i++; break; }
+                    await m[dd].Run();
                 }
-                else
+                else if (b.StartsWith("log"))
                 {
-                    //int num = a
+                    var c = DeleteFormerSpace(b);
+                    log(c.Substring(3));
                 }
+                else if(b.StartsWith("loop"))
+                {
+                    int startCount = i;
+                    int endCount = 0;
+                    
+                    int loopCount= 1;
+                    int.TryParse(b.Replace("loop", "").Trim().Trim('{'), out loopCount);
+                    log(b.Replace("loop", "").Trim().Trim('{'));
+
+                    int num = 0;
+                    int loopBUNcount = 1;
+                    int KAKKOcount = 0;
+                    while (true)
+                    {
+                        num++;
+                        var t = a[startCount+num];
+                        if (t.Trim().StartsWith("loop")) {
+                            loopBUNcount++;
+                        }
+                        else if (t.Contains("}"))
+                        {
+                            KAKKOcount++;
+                        }
+                        if (loopBUNcount == KAKKOcount) {
+                            endCount = i + num;
+                            break; 
+                        }
+                    }
+
+                    i=endCount;
+
+                    if(endCount == startCount + 1)
+                    {
+                        continue;
+                    }
+
+                    string result = "";
+                    for (int j = startCount+1; j <= endCount -1; j++)
+                    {
+                        result+= (a[j]+"\n");
+                    }
+                    for( int j = 0; j < loopCount; j++)
+                    {
+
+                        await this.ExecLoopTask(result);
+                    }
+                }
+                i++;
             }
         }
 
-        async Task ExecLoopTask(AnalyzeResult aa)
+        string DeleteFormerSpace(string s)
         {
-            if (aa.processType == ProcessType.Wait)
+            int i = 0;
+            while (i < s.Length)
             {
-                await Task.Delay(int.Parse(aa.data));
+                if(s[i] == ' ')
+                {
+                    i++;
+                }
+                else
+                {
+                    return s.Substring(i);
+                }
             }
-            else if (aa.processType == ProcessType.Push)
-            {
-                m[int.Parse(aa.data)].Run();
-            }
-            else
-            {
-                int num=a
-            }
+            return "";
         }
 
         private void Error(string s)
@@ -252,11 +332,6 @@ loop 3;
         }
 
 
-        public struct AnalyzeResult
-        {
-            public ProcessType processType;
-            public string data;
-        }
         public enum ProcessType { Wait,Loop,Push}
 
         async Task Fighting()
@@ -299,13 +374,12 @@ loop 3;
         {
             this.p = new Point(X, Y);
         }
-        public async void Run()
+        public async Task Run()
         {
             MouseOperations.SetCursorPosition(p.X, p.Y);
             MouseOperations.MouseEvent(MouseOperations.MouseEventFlags.LeftDown);
             await d(0.1f);
             MouseOperations.MouseEvent(MouseOperations.MouseEventFlags.LeftUp);
-            AutoCat.Instance.log($"クリック:{p.X},{p.Y}");
             AutoCat.Instance.log($"クリック:{p.X},{p.Y}");
         }
 
